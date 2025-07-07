@@ -63,7 +63,7 @@ func (store *store) Read(pos uint64) (message []byte, err error) {
 	store.mu.Lock()
 	defer store.mu.Unlock()
 
-	// flush the message from buffer to file if not done already
+	// flush the remaining buffer to file if not done already
 	if err := store.buf.Flush(); err != nil {
 		return nil, fmt.Errorf("error flushing buffer to file. Error- %w", err)
 	}
@@ -80,4 +80,18 @@ func (store *store) Read(pos uint64) (message []byte, err error) {
 	}
 
 	return b, nil
+}
+
+func (store *store) Close() error {
+	store.mu.Lock()
+	defer store.mu.Unlock()
+
+	// flush the remaining buffer to file if not done already
+	if err := store.buf.Flush(); err != nil {
+		return err
+	}
+
+	store.File.Close()
+
+	return nil
 }
