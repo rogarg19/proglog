@@ -41,21 +41,43 @@ func (store *store) Append(message []byte) (w uint64, pos uint64, err error) {
 	store.mu.Lock()
 	defer store.mu.Unlock()
 
-	if err := binary.Write(store.buf, enc, len(message)); err != nil {
-		return 0, 0, fmt.Errorf("failed to write length of message. Error %s", err)
+	pos = store.size
+
+	if err := binary.Write(store.buf, enc, uint64(len(message))); err != nil {
+		return 0, 0, fmt.Errorf("failed to write length of message. Error %w", err)
 	}
 
 	n, err := store.buf.Write(message)
 
 	if err != nil {
-		return 0, 0, fmt.Errorf("failed to append message. Error %s", err)
+		return 0, 0, fmt.Errorf("failed to append message. Error %w", err)
 	}
 
 	n += lenWidth
-
 	store.size += uint64(n)
+
+	return uint64(n), pos, nil
 }
 
 func (store *store) Read(pos uint64) (message []byte, err error) {
+	store.mu.Lock()
+	defer store.mu.Unlock()
 
+	// flush the message from buffer to file if not done already
+	if err := store.buf.Flush(); err != nil {
+		return nil, fmt.Errorf("error flushing buffer to file. Error- %w", err)
+	}
+
+	size := make([]byte, lenWidth)
+
+	if _, err := store.File.ReadAt(size, int64(pos)); err != nil {
+		return nil, err
+	}
+
+	b := make([]byte, enc.Uint64(size))
+	if _, err := store.File.ReadAt(b, int64(pos+lenWidth)); err != nil {
+		return nil, err
+	}
+
+	return b, nil
 }
