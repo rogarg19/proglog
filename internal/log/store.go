@@ -3,6 +3,7 @@ package log
 import (
 	"bufio"
 	"encoding/binary"
+	"fmt"
 	"os"
 	"sync"
 )
@@ -34,4 +35,27 @@ func newStore(f *os.File) (*store, error) {
 		size: size,
 		buf:  bufio.NewWriter(f),
 	}, nil
+}
+
+func (store *store) Append(message []byte) (w uint64, pos uint64, err error) {
+	store.mu.Lock()
+	defer store.mu.Unlock()
+
+	if err := binary.Write(store.buf, enc, len(message)); err != nil {
+		return 0, 0, fmt.Errorf("failed to write length of message. Error %s", err)
+	}
+
+	n, err := store.buf.Write(message)
+
+	if err != nil {
+		return 0, 0, fmt.Errorf("failed to append message. Error %s", err)
+	}
+
+	n += lenWidth
+
+	store.size += uint64(n)
+}
+
+func (store *store) Read(pos uint64) (message []byte, err error) {
+
 }
