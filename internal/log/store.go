@@ -23,6 +23,7 @@ type store struct {
 	size uint64
 }
 
+// Creates a new disk store with passed file
 func newStore(f *os.File) (*store, error) {
 	fi, err := os.Stat(f.Name())
 	if err != nil {
@@ -37,6 +38,7 @@ func newStore(f *os.File) (*store, error) {
 	}, nil
 }
 
+// Appends message bytes to the store via buffer. Returns total bytes written, pos of appended record and error if any
 func (store *store) Append(message []byte) (w uint64, pos uint64, err error) {
 	store.mu.Lock()
 	defer store.mu.Unlock()
@@ -59,7 +61,8 @@ func (store *store) Append(message []byte) (w uint64, pos uint64, err error) {
 	return uint64(n), pos, nil
 }
 
-func (store *store) Read(pos uint64) (message []byte, err error) {
+// Reads message from store stored at a specific postion
+func (store *store) Read(pos uint64) ([]byte, error) {
 	store.mu.Lock()
 	defer store.mu.Unlock()
 
@@ -82,6 +85,20 @@ func (store *store) Read(pos uint64) (message []byte, err error) {
 	return b, nil
 }
 
+// Reads message from store stored at a specific postion
+func (store *store) ReadAt(message []byte, offset int64) (int, error) {
+	store.mu.Lock()
+	defer store.mu.Unlock()
+
+	// flush the remaining buffer to file if not done already
+	if err := store.buf.Flush(); err != nil {
+		return 0, fmt.Errorf("error flushing buffer to file. Error- %w", err)
+	}
+
+	return store.File.ReadAt(message, offset)
+}
+
+// Closes the store, flushing any remaining buffer
 func (store *store) Close() error {
 	store.mu.Lock()
 	defer store.mu.Unlock()
